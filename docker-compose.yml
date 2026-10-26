@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ohmventory
+      POSTGRES_USER: ohmventory
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ohmventory}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ohmventory"]
+      interval: 5s
+      retries: 10
+
+  searxng:
+    image: searxng/searxng:latest
+    volumes:
+      - ./docker/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    ports:
+      - "8888:8080"
+
+  api:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Ohmventory: Host=db;Database=ohmventory;Username=ohmventory;Password=${POSTGRES_PASSWORD:-ohmventory}
+      # LM Studio läuft direkt auf dem Mac, nicht im Container.
+      Llm__Endpoint: ${LLM_ENDPOINT:-http://host.docker.internal:1234/v1}
+      Llm__VisionModel: ${LLM_VISION_MODEL:-gemma-4-26b-a4b-it-qat-mlx}
+      Llm__ChatModel: ${LLM_CHAT_MODEL:-gemma-4-26b-a4b-it-qat-mlx}
+      Searxng__BaseUrl: http://searxng:8080
+      Labels__PublicBaseUrl: ${PUBLIC_BASE_URL:-http://localhost:8080}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - images:/data
+
+  web:
+    build: ./frontend
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+volumes:
+  db-data:
+  images:

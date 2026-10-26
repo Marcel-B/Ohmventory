@@ -1,0 +1,13 @@
+# Minimal-Konfiguration: JSON-Ausgabe aktivieren, damit das Backend die Suche nutzen kann.
+use_default_settings: true
+
+server:
+  secret_key: "change-me-in-production"
+  limiter: false
+  image_proxy: false
+
+search:
+  safe_search: 0
+  formats:
+    - html
+    - json

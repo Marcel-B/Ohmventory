@@ -1,0 +1,9 @@
+@import 'tailwindcss';
+@import 'tailwindcss-primeui';
+
+@custom-variant dark (@media (prefers-color-scheme: dark));
+
+html,
+body {
+  @apply min-h-full bg-surface-50 text-surface-900 dark:bg-surface-950 dark:text-surface-0;
+}
