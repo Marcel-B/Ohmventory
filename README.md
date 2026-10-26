@@ -20,7 +20,7 @@ Das LLM wird über die OpenAI-kompatible API angesprochen; Endpoint und Modellna
 ## Starten mit Docker
 
 1. In LM Studio unter *Developer* den lokalen Server starten (Port 1234) und das Modell laden.
-2. `cp .env.example .env` und `PUBLIC_BASE_URL` auf die LAN-Adresse des Rechners setzen, damit QR-Codes vom Handy aus funktionieren.
+2. `cp .env.example .env`, ein `POSTGRES_PASSWORD` eintragen und `PUBLIC_BASE_URL` auf die LAN-Adresse des Rechners setzen, damit QR-Codes vom Handy aus funktionieren.
 3. `docker compose up -d --build`
 4. App unter <http://localhost:8080> öffnen.
 
@@ -29,11 +29,13 @@ Erreicht der API-Container LM Studio nicht, in LM Studio „Serve on Local Netwo
 ## Entwicklung
 
 ```bash
-# Datenbank und Suche
+# Datenbank und Suche (POSTGRES_PASSWORD muss in .env gesetzt sein)
 docker compose up -d db searxng
 
-# Backend (http://localhost:5080)
+# Backend (http://localhost:5080); Passwort einmalig als User-Secret hinterlegen
 cd backend
+dotnet user-secrets set --project src/Ohmventory.Api "ConnectionStrings:Ohmventory" \
+  "Host=localhost;Database=ohmventory;Username=ohmventory;Password=<dein Passwort>"
 dotnet run --project src/Ohmventory.Api --urls http://localhost:5080
 dotnet test
 

@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: ohmventory
       POSTGRES_USER: ohmventory
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ohmventory}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env setzen}
     volumes:
       - db-data:/var/lib/postgresql/data
     ports:
@@ -27,7 +27,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      ConnectionStrings__Ohmventory: Host=db;Database=ohmventory;Username=ohmventory;Password=${POSTGRES_PASSWORD:-ohmventory}
+      ConnectionStrings__Ohmventory: Host=db;Database=ohmventory;Username=ohmventory;Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env setzen}
       # LM Studio läuft direkt auf dem Mac, nicht im Container.
       Llm__Endpoint: ${LLM_ENDPOINT:-http://host.docker.internal:1234/v1}
       Llm__VisionModel: ${LLM_VISION_MODEL:-gemma-4-26b-a4b-it-qat-mlx}
