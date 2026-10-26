@@ -32,7 +32,7 @@ services:
       ConnectionStrings__Ohmventory: Host=db;Database=ohmventory;Username=ohmventory;Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env setzen}
       # LM Studio läuft auf oi-o-mat („Serve on Local Network“), nicht im Container.
       Llm__Endpoint: ${LLM_ENDPOINT:-http://192.168.2.122:1234/v1}
-      Llm__VisionModel: ${LLM_MODEL:-gemma-4-e4b-it-mlx}
+      Llm__VisionModel: ${LLM_VISION_MODEL:-${LLM_MODEL:-gemma-4-e4b-it-mlx}}
       Llm__ChatModel: ${LLM_MODEL:-gemma-4-e4b-it-mlx}
       Llm__ContextLength: ${LLM_CONTEXT_LENGTH:-8192}
       Llm__ControlToken: ${LLM_CONTROL_TOKEN:-}

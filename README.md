@@ -21,7 +21,7 @@ Das LLM wird über die OpenAI-kompatible API angesprochen; Endpoint und Modell s
 
 LM Studio auf oi-o-mat teilt sich den Speicher mit Tonwerk-AI. Damit Ohmventory nicht stört:
 
-- **Kleines, festes Modell:** `gemma-4-e4b-it-mlx` (≈ 7 GB, kann Bilder und Tool-Calls).
+- **Kleines, festes Modell:** `gemma-4-e4b-it-mlx` (≈ 7 GB, kann Bilder und Tool-Calls). Für die Fotoerkennung lässt sich mit `LLM_VISION_MODEL` ein größeres Modell setzen (z. B. `gemma-4-26b-a4b-it-qat-mlx`, ≈ 16 GB). Das passt nicht neben die großen Tonwerk-Modelle: dann in der yue-guard-Konfiguration beide Modelle unter `MODELS` eintragen und `PAUSE_FOR` leer lassen.
 - **Feste Kontextlänge:** Vor jeder Anfrage prüft das Backend über `GET /api/v1/models`, ob das Modell geladen ist, und lädt es sonst mit `POST /api/v1/models/load` und `context_length` 8192. Andere Modelle werden nie angefasst, entladen wird nichts.
 - **Eingaben gekürzt:** Anfragen werden vorab auf das Kontextbudget geschätzt; lange Werkzeugergebnisse und Recherchetexte werden gekürzt, statt an LM Studio zu scheitern.
 - **Entladenes Modell:** Verbindungs- und Serverfehler werden bis zu 5 Minuten mit Backoff wiederholt. Gespeichert wird erst, wenn die Antwort vollständig ist.

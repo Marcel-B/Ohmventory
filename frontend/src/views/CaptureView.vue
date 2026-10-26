@@ -187,9 +187,15 @@ onMounted(async () => {
               Gelesen: {{ result.recognized.markingsRead.join(', ') }}
             </span>
           </div>
+          <p v-if="result.recognized.observations" class="text-sm text-surface-500">
+            <i class="pi pi-eye mr-1" />{{ result.recognized.observations }}
+          </p>
           <p v-if="result.recognized.alternatives.length" class="text-sm text-surface-500">
             Alternativen: {{ result.recognized.alternatives.join(', ') }}
           </p>
+          <Message v-if="result.recognized.confidence < 0.6" severity="secondary" size="small">
+            Unsicher. Hilfreich sind ein Foto der Seite mit der Beschriftung oder ein Hinweis wie „Display“, dann noch einmal erkennen.
+          </Message>
           <div v-if="result.matches.length" class="flex flex-col gap-2">
             <span class="font-medium">Schon im Lager:</span>
             <div

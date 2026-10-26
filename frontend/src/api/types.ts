@@ -102,6 +102,7 @@ export interface RecognizedPart {
   markingsRead: string[]
   alternatives: string[]
   confidence: number
+  observations: string | null
 }
 
 export interface RecognitionResponse {
