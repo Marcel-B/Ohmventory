@@ -10,11 +10,14 @@ import { ref } from 'vue'
 import { api } from '../api/client'
 import type { ProjectProposal } from '../api/types'
 import AvailabilityTable from '../components/AvailabilityTable.vue'
+import LlmPausedNotice from '../components/LlmPausedNotice.vue'
+import { useLlmStatus } from '../composables/useLlmStatus'
 import { useNotify } from '../composables/useNotify'
 import { useAssistantStore } from '../stores/assistant'
 
 const store = useAssistantStore()
 const notify = useNotify()
+const { status: llmStatus, refresh: refreshLlmStatus } = useLlmStatus()
 
 const examples = ['Was kann ich mit meinem Lager bauen?', 'Kann ich ein Thermometer bauen?', 'Ein kleines Projekt mit einem Display für das Wochenende']
 const saved = ref(new Map<string, string>())
@@ -63,15 +66,17 @@ async function addMissing(project: ProjectProposal) {
   }
 }
 
-function ask() {
+async function ask() {
   saved.value = new Map()
-  store.ask()
+  await store.ask()
+  if (store.error) refreshLlmStatus()
 }
 </script>
 
 <template>
   <section class="mx-auto flex max-w-4xl flex-col gap-4">
     <h1 class="text-2xl font-semibold">Projektassistent</h1>
+    <LlmPausedNotice :status="llmStatus" />
 
     <Card>
       <template #content>
@@ -80,10 +85,10 @@ function ask() {
           <div class="flex flex-wrap gap-2">
             <Button v-for="example in examples" :key="example" :label="example" size="small" severity="secondary" outlined @click="store.question = example" />
           </div>
-          <Button type="submit" label="Fragen" icon="pi pi-sparkles" class="self-end" :loading="store.loading" :disabled="!store.question.trim()" />
+          <Button type="submit" label="Fragen" icon="pi pi-sparkles" class="self-end" :loading="store.loading" :disabled="!store.question.trim() || llmStatus?.paused" />
           <div v-if="store.loading" class="flex flex-col gap-1">
             <ProgressBar mode="indeterminate" class="h-1" />
-            <span class="text-sm text-surface-500">Das lokale Modell recherchiert im Lager und im Web. Das kann ein paar Minuten dauern.</span>
+            <span class="text-sm text-surface-500">Das lokale Modell recherchiert im Lager und im Web. Das kann ein paar Minuten dauern, vor allem wenn es erst geladen werden muss.</span>
           </div>
         </form>
       </template>

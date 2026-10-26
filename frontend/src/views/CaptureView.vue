@@ -11,8 +11,10 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type { PartFields, RecognitionResponse } from '../api/types'
+import LlmPausedNotice from '../components/LlmPausedNotice.vue'
 import PartForm from '../components/PartForm.vue'
 import { resizeImage } from '../composables/resizeImage'
+import { useLlmStatus } from '../composables/useLlmStatus'
 import { useNotify } from '../composables/useNotify'
 import { useContainersStore } from '../stores/containers'
 import { usePartsStore } from '../stores/parts'
@@ -22,6 +24,7 @@ const router = useRouter()
 const notify = useNotify()
 const containers = useContainersStore()
 const parts = usePartsStore()
+const { status: llmStatus, refresh: refreshLlmStatus } = useLlmStatus()
 
 const fileInput = ref<HTMLInputElement>()
 const image = ref<Blob | null>(null)
@@ -93,6 +96,7 @@ async function recognize() {
     }
   } catch (e) {
     recognitionError.value = e instanceof Error ? e.message : String(e)
+    refreshLlmStatus()
   } finally {
     recognizing.value = false
   }
@@ -141,6 +145,7 @@ onMounted(async () => {
 <template>
   <section class="mx-auto flex max-w-3xl flex-col gap-4">
     <h1 class="text-2xl font-semibold">Bauteil erfassen</h1>
+    <LlmPausedNotice :status="llmStatus" />
 
     <Card>
       <template #content>
@@ -159,7 +164,7 @@ onMounted(async () => {
           </div>
           <div class="flex flex-wrap gap-2">
             <InputText v-model="hint" placeholder="Optionaler Hinweis, z. B. „Sensor aus dem 37er-Kit“" class="min-w-0 flex-1" />
-            <Button label="Erkennen" icon="pi pi-sparkles" :disabled="!image" :loading="recognizing" @click="recognize" />
+            <Button label="Erkennen" icon="pi pi-sparkles" :disabled="!image || llmStatus?.paused" :loading="recognizing" @click="recognize" />
           </div>
           <ProgressBar v-if="recognizing" mode="indeterminate" class="h-1" />
           <Message v-if="recognitionError" severity="error">{{ recognitionError }}</Message>

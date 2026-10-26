@@ -1,5 +1,6 @@
 import type {
   AssistantAnswer,
+  LlmStatus,
   Container,
   ContainerDetail,
   ContainerFields,
@@ -87,6 +88,9 @@ export const api = {
     update: (id: string, fields: ContainerFields) => request<Container>(`/containers/${id}`, { method: 'PUT', body: json(fields) }),
     remove: (id: string) => request<void>(`/containers/${id}`, { method: 'DELETE' }),
     labelUrl: (code: string) => `/api/containers/${encodeURIComponent(code)}/label.svg`,
+  },
+  llm: {
+    status: () => request<LlmStatus>('/llm/status'),
   },
   assistant: {
     ask: (question: string) => request<AssistantAnswer>('/assistant/ask', { method: 'POST', body: json({ question }) }),

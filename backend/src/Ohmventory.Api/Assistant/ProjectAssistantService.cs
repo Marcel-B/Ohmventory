@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Options;
 using Ohmventory.Api.Llm;
 using Ohmventory.Api.Search;
 
@@ -35,8 +36,12 @@ public class ProjectAssistantService(
     [FromKeyedServices(LlmServiceCollectionExtensions.ChatClientKey)] IChatClient chat,
     InventoryQueries inventory,
     SearxngClient search,
+    IOptions<LlmOptions> llmOptions,
     ILogger<ProjectAssistantService> logger)
 {
+    private const int MaxOverviewEntries = 150;
+    private const int MaxSnippetChars = 300;
+
     private const string ResearchPrompt = """
         Du bist ein Elektronik-Bastelassistent. Der Nutzer hat ein Lager mit Elektronikbauteilen.
         Nutze die Werkzeuge:
@@ -64,7 +69,7 @@ public class ProjectAssistantService(
                 "search_inventory",
                 "Sucht im Bauteillager und liefert Treffer mit Menge und Container."),
             AIFunctionFactory.Create(
-                async () => await inventory.OverviewAsync(ct),
+                async () => CompactOverview(await inventory.OverviewAsync(ct)),
                 "inventory_overview",
                 "Liefert alle Bauteile im Lager mit Menge."),
             AIFunctionFactory.Create(
@@ -72,7 +77,8 @@ public class ProjectAssistantService(
                 {
                     try
                     {
-                        return (object)await search.SearchAsync(query, ct);
+                        var results = await search.SearchAsync(query, ct);
+                        return (object)results.Select(r => r with { Snippet = Shorten(r.Snippet, MaxSnippetChars) }).ToList();
                     }
                     catch (Exception ex)
                     {
@@ -89,8 +95,13 @@ public class ProjectAssistantService(
             new ChatOptions { Tools = tools, Temperature = 0.4f },
             ct);
 
+        // Die Recherche kann lang werden; für die Strukturierung muss sie samt Schema in den Kontext passen.
+        var o = llmOptions.Value;
+        var researchBudget = o.ContextLength - o.MaxOutputTokens - 1500;
+        var researchText = ContextBudget.Truncate(research.Text, researchBudget);
+
         var structured = await chat.GetResponseAsync<ProjectSuggestions>(
-            [new ChatMessage(ChatRole.System, StructurePrompt), new ChatMessage(ChatRole.User, research.Text)],
+            [new ChatMessage(ChatRole.System, StructurePrompt), new ChatMessage(ChatRole.User, researchText)],
             new ChatOptions { Temperature = 0.0f },
             cancellationToken: ct);
 
@@ -108,6 +119,20 @@ public class ProjectAssistantService(
 
         return new AssistantAnswer(question, research.Text, proposals);
     }
+
+    /// <summary>Kompakte Zeilen statt JSON, damit auch ein großes Lager in den Kontext passt.</summary>
+    public static string CompactOverview(IReadOnlyList<InventoryEntry> entries)
+    {
+        var lines = entries.Take(MaxOverviewEntries)
+            .Select(e => $"{e.Name}{(e.PartNumber is null || e.Name.Contains(e.PartNumber, StringComparison.OrdinalIgnoreCase) ? "" : $" ({e.PartNumber})")}: {e.Quantity}");
+        var text = string.Join('\n', lines);
+        return entries.Count > MaxOverviewEntries
+            ? $"{text}\n… und {entries.Count - MaxOverviewEntries} weitere Bauteile (gezielt mit search_inventory suchen)"
+            : text.Length == 0 ? "Das Lager ist leer." : text;
+    }
+
+    private static string? Shorten(string? text, int maxChars) =>
+        text is null || text.Length <= maxChars ? text : text[..maxChars] + "…";
 
     public static PartAvailability CheckAvailability(SuggestedPart needed, IEnumerable<Domain.Part> parts)
     {

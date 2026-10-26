@@ -153,6 +153,14 @@ export interface Project {
   parts: PartAvailability[]
 }
 
+export interface LlmStatus {
+  paused: boolean
+  pausedSince: string | null
+  visionModel: string
+  chatModel: string
+  contextLength: number
+}
+
 export interface ShoppingListItem {
   id: string
   name: string

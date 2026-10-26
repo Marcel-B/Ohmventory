@@ -23,12 +23,9 @@ public static class ProjectEndpoints
             {
                 return TypedResults.Ok(await assistant.AskAsync(dto.Question.Trim(), ct));
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
-                return TypedResults.Problem(
-                    title: "Projektassistent fehlgeschlagen",
-                    detail: $"Das lokale LLM war nicht erreichbar oder lieferte keine gültige Antwort: {ex.Message}",
-                    statusCode: StatusCodes.Status502BadGateway);
+                return LlmEndpoints.Problem("Projektassistent fehlgeschlagen", ex);
             }
         }).WithTags("Projekte");
 

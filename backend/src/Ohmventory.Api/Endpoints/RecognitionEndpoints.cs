@@ -46,12 +46,9 @@ public static class RecognitionEndpoints
             {
                 recognized = await recognition.RecognizeAsync(bytes, file.ContentType, hint, ct);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
-                return TypedResults.Problem(
-                    title: "Bauteilerkennung fehlgeschlagen",
-                    detail: $"Das lokale LLM war nicht erreichbar oder lieferte keine gültige Antwort: {ex.Message}",
-                    statusCode: StatusCodes.Status502BadGateway);
+                return LlmEndpoints.Problem("Bauteilerkennung fehlgeschlagen", ex);
             }
 
             var image = new PartImage

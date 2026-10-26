@@ -56,6 +56,7 @@ app.MapContainerEndpoints();
 app.MapRecognitionEndpoints();
 app.MapProjectEndpoints();
 app.MapShoppingListEndpoints();
+app.MapLlmEndpoints();
 
 app.Run();
 

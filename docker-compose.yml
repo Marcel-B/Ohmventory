@@ -28,10 +28,13 @@ services:
         condition: service_healthy
     environment:
       ConnectionStrings__Ohmventory: Host=db;Database=ohmventory;Username=ohmventory;Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env setzen}
-      # LM Studio läuft direkt auf dem Mac, nicht im Container.
-      Llm__Endpoint: ${LLM_ENDPOINT:-http://host.docker.internal:1234/v1}
-      Llm__VisionModel: ${LLM_VISION_MODEL:-gemma-4-26b-a4b-it-qat-mlx}
-      Llm__ChatModel: ${LLM_CHAT_MODEL:-gemma-4-26b-a4b-it-qat-mlx}
+      # LM Studio läuft auf oi-o-mat („Serve on Local Network“), nicht im Container.
+      Llm__Endpoint: ${LLM_ENDPOINT:-http://192.168.2.122:1234/v1}
+      Llm__VisionModel: ${LLM_MODEL:-gemma-4-e4b-it-mlx}
+      Llm__ChatModel: ${LLM_MODEL:-gemma-4-e4b-it-mlx}
+      Llm__ContextLength: ${LLM_CONTEXT_LENGTH:-8192}
+      Llm__ControlToken: ${LLM_CONTROL_TOKEN:-}
+      Llm__StateFile: /data/llm-paused
       Searxng__BaseUrl: http://searxng:8080
       Labels__PublicBaseUrl: ${PUBLIC_BASE_URL:-http://localhost:8080}
     extra_hosts:
