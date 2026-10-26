@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Legt auf dem Proxmox-Host einen LXC-Container mit Docker an und startet Ohmventory darin.
-# Erneut aufgerufen mit der CT-ID eines bestehenden Containers, aktualisiert es Ohmventory nur
-# (git pull + docker compose up --build); .env und Daten bleiben erhalten.
+# Mit der CT-ID eines bestehenden Containers installiert bzw. aktualisiert es Ohmventory darin
+# (fehlendes Docker wird nachinstalliert); .env und Daten bleiben erhalten.
 #
 # Aufruf auf dem Proxmox-Host als root, z. B.:
 #   bash install-lxc.sh
@@ -87,13 +87,20 @@ create_container() {
     sleep 2
   done
   in_ct "getent hosts deb.debian.org >/dev/null" || die "Container hat kein Netzwerk."
+}
 
-  log "Docker installieren"
+# Auch für Container, die von Hand angelegt wurden (Debian/Ubuntu): fehlende Pakete und Docker nachinstallieren.
+ensure_docker() {
+  if in_ct "command -v docker >/dev/null && command -v git >/dev/null && command -v openssl >/dev/null && command -v curl >/dev/null"; then
+    return
+  fi
+  log "Docker und Hilfsprogramme installieren"
   in_ct "export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
     apt-get install -y -qq ca-certificates curl git openssl >/dev/null
-    curl -fsSL https://get.docker.com | sh >/dev/null
+    command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh >/dev/null
     systemctl enable --now docker >/dev/null"
+  in_ct "docker info >/dev/null 2>&1" || die "Docker startet nicht. Hat der Container die Features nesting=1 und keyctl=1? (pct set $CTID --features nesting=1,keyctl=1, dann neu starten)"
 }
 
 install_app() {
@@ -160,11 +167,12 @@ SUMMARY
 }
 
 if [[ -n $CTID ]] && pct status "$CTID" >/dev/null 2>&1; then
-  log "Container $CTID existiert, nur Ohmventory aktualisieren"
+  log "Container $CTID existiert, Ohmventory darin installieren bzw. aktualisieren"
   [[ $(pct status "$CTID") == *running* ]] || pct start "$CTID"
 else
   CTID="${CTID:-$(pvesh get /cluster/nextid)}"
   create_container
 fi
 
+ensure_docker
 install_app
