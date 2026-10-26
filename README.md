@@ -29,6 +29,20 @@ LM Studio auf oi-o-mat teilt sich den Speicher mit Tonwerk-AI. Damit Ohmventory 
 
 Die Vorlage für den Wächter liegt in [`docker/yue-guard/ohmventory.conf`](docker/yue-guard/ohmventory.conf). Danach mit `yue-guard status` prüfen und z. B. in Tonwerk „Cover malen“ starten: nach höchstens 30 s steht `ohmventory: angehalten`.
 
+## Installation auf Proxmox (empfohlen)
+
+Auf dem Proxmox-Host als root:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/Marcel-B/Ohmventory/main/deploy/proxmox/install-lxc.sh
+bash install-lxc.sh                                        # DHCP, nächste freie CT-ID
+CTID=120 IP=192.168.2.130/24 GATEWAY=192.168.2.1 bash install-lxc.sh   # statische IP
+```
+
+Das Skript legt einen unprivilegierten Debian-12-Container mit Docker an (`nesting`, `keyctl`, Autostart), klont das Repository nach `/opt/ohmventory`, erzeugt eine `.env` mit zufälligen Passwörtern, startet den Stack, prüft, ob LM Studio erreichbar ist, und gibt am Ende die fertige yue-guard-Konfiguration mit der richtigen CT-ID aus. Alle Optionen stehen im Kopf des Skripts.
+
+Update: dasselbe Skript mit der CT-ID des bestehenden Containers aufrufen (`CTID=120 bash install-lxc.sh`). `.env` und Daten bleiben erhalten.
+
 ## Starten mit Docker
 
 1. In LM Studio muss der Server laufen und „Serve on Local Network“ an sein; das Modell lädt Ohmventory selbst.

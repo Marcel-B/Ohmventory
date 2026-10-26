@@ -2,6 +2,7 @@
 use_default_settings: true
 
 server:
+  # Wird über die Umgebungsvariable SEARXNG_SECRET (aus .env) überschrieben.
   secret_key: "change-me-in-production"
   limiter: false
   image_proxy: false
