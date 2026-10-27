@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Ohmventory.Api/Ohmventory.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Ohmventory.Api.Tests/Ohmventory.Api.Tests.csproj" />
+  </Folder>
+</Solution>
