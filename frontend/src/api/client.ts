@@ -74,9 +74,10 @@ export const api = {
     assign: (id: string, partId: string) => request<void>(`/images/${id}/assign/${partId}`, { method: 'POST' }),
   },
   recognition: {
-    recognize: (file: Blob, hint?: string) => {
+    recognize: (file: Blob, hint?: string, views: Blob[] = []) => {
       const form = new FormData()
       form.append('file', file)
+      views.forEach((view, i) => form.append('views', view, `view-${i}.jpg`))
       if (hint) form.append('hint', hint)
       return request<RecognitionResponse>('/recognition', { method: 'POST', body: form })
     },

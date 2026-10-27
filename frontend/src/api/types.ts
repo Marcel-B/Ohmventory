@@ -103,6 +103,8 @@ export interface RecognizedPart {
   alternatives: string[]
   confidence: number
   observations: string | null
+  webFinding: string | null
+  sources: { title: string; url: string }[]
 }
 
 export interface RecognitionResponse {

@@ -13,6 +13,7 @@ public record RecognitionResponse(Guid ImageId, RecognizedPart Recognized, IRead
 public static class RecognitionEndpoints
 {
     private const long MaxImageBytes = 15 * 1024 * 1024;
+    private const int MaxViews = 2;
 
     private static readonly Dictionary<string, string> AllowedTypes = new()
     {
@@ -26,6 +27,7 @@ public static class RecognitionEndpoints
         app.MapPost("/api/recognition", async Task<Results<Ok<RecognitionResponse>, ValidationProblem, ProblemHttpResult>> (
             IFormFile file,
             [Microsoft.AspNetCore.Mvc.FromForm] string? hint,
+            HttpRequest request,
             PartRecognitionService recognition,
             InventoryQueries inventory,
             ImageStorage storage,
@@ -41,10 +43,21 @@ public static class RecognitionEndpoints
             await file.CopyToAsync(buffer, ct);
             var bytes = buffer.ToArray();
 
+            // Gedrehte Ansichten desselben Fotos schickt die App mit, damit senkrechter Text lesbar wird. Sie werden nicht gespeichert.
+            var views = new List<(byte[] Data, string MediaType)>();
+            foreach (var view in request.Form.Files.GetFiles("views").Take(MaxViews))
+            {
+                if (!AllowedTypes.ContainsKey(view.ContentType) || view.Length is 0 or > MaxImageBytes)
+                    return PartEndpoints.Validation("views", "Zusätzliche Ansichten müssen JPEG, PNG oder WebP bis 15 MB sein.");
+                using var viewBuffer = new MemoryStream();
+                await view.CopyToAsync(viewBuffer, ct);
+                views.Add((viewBuffer.ToArray(), view.ContentType));
+            }
+
             RecognizedPart recognized;
             try
             {
-                recognized = await recognition.RecognizeAsync(bytes, file.ContentType, hint, ct);
+                recognized = await recognition.RecognizeAsync(bytes, file.ContentType, views, hint, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
