@@ -41,7 +41,19 @@ CTID=120 IP=192.168.2.130/24 GATEWAY=192.168.2.1 bash install-lxc.sh   # statisc
 
 Das Skript legt einen unprivilegierten Debian-12-Container mit Docker an (`nesting`, `keyctl`, Autostart), klont das Repository nach `/opt/ohmventory`, erzeugt eine `.env` mit zufälligen Passwörtern, startet den Stack, prüft, ob LM Studio erreichbar ist, und gibt am Ende die fertige yue-guard-Konfiguration mit der richtigen CT-ID aus. Alle Optionen stehen im Kopf des Skripts.
 
-Update: dasselbe Skript mit der CT-ID des bestehenden Containers aufrufen (`CTID=120 bash install-lxc.sh`). `.env` und Daten bleiben erhalten.
+Update von Hand: dasselbe Skript mit der CT-ID des bestehenden Containers aufrufen (`CTID=120 bash install-lxc.sh`). `.env` und Daten bleiben erhalten.
+
+### Auto-Update
+
+Das Installationsskript richtet im Container den systemd-Timer `ohmventory-update.timer` ein. Er führt alle 5 Minuten [`deploy/auto-update.sh`](deploy/auto-update.sh) aus:
+
+1. Gibt es einen neuen Commit auf `main`, wartet das Skript, bis die CI-Checks `backend` und `frontend` dafür grün sind. Ein Commit mit roter CI wird nie installiert.
+2. Dann baut und startet es den neuen Stand und prüft `/api/health`.
+3. Startet die App nicht, kehrt es zum vorherigen Stand zurück und überspringt diesen Commit, bis ein neuer kommt.
+
+Logs: `pct exec <CTID> -- journalctl -u ohmventory-update`. Sofort prüfen: `pct exec <CTID> -- systemctl start ohmventory-update`. Abschalten: `AUTO_UPDATE=0 CTID=<CTID> bash install-lxc.sh`.
+
+Hinweis: Datenbank-Migrationen laufen beim Start der API. Ein Zurückrollen setzt den Code zurück, nicht die Datenbank.
 
 ## Starten mit Docker
 
