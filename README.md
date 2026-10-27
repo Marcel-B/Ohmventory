@@ -2,7 +2,7 @@
 
 Lagerverwaltung für Elektronikbauteile mit Fotoerkennung und Projektvorschlägen über ein lokales LLM.
 
-- **Erfassen:** Foto eines Bauteils oder Breakout-Boards hochladen, ein Vision-Modell erkennt es, du bestätigst und gibst Menge und Container an.
+- **Erfassen:** Foto eines Bauteils oder Breakout-Boards hochladen, ein Vision-Modell erkennt es, du bestätigst und gibst Menge und Container an. Ist keine Typbezeichnung lesbar, liest ein zweiter Durchgang die Aufdrucke (auch senkrechte, über gedrehte Ansichten), sucht mit Modulaufdrucken wie `1.30" IIC V2.2` per SearXNG im Web und bestimmt das konkrete Board; Bestückungsdrucke (C1, R1) und Pin-Namen zählen dabei nicht. Die App zeigt die Quellen an.
 - **Container:** Lagerorte (z. B. gedruckte Catch-all-Trays) mit kurzen Codes wie `T-001`, verschachtelbar, mit druckbaren QR-Etiketten. Der QR-Code öffnet die Inhaltsansicht des Containers.
 - **Projektassistent:** Frag z. B. „Kann ich ein Thermometer bauen?“. Das Modell durchsucht Lager und Web (SearXNG), schlägt Projekte mit Stückliste vor, das Backend gleicht die Stückliste mit dem Bestand ab, und Fehlendes landet auf Knopfdruck in der Einkaufsliste.
 

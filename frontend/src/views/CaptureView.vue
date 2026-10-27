@@ -13,7 +13,7 @@ import { api } from '../api/client'
 import type { PartFields, RecognitionResponse } from '../api/types'
 import LlmPausedNotice from '../components/LlmPausedNotice.vue'
 import PartForm from '../components/PartForm.vue'
-import { resizeImage } from '../composables/resizeImage'
+import { resizeImage, rotateImage } from '../composables/resizeImage'
 import { useLlmStatus } from '../composables/useLlmStatus'
 import { useNotify } from '../composables/useNotify'
 import { useContainersStore } from '../stores/containers'
@@ -81,7 +81,9 @@ async function recognize() {
   recognizing.value = true
   recognitionError.value = null
   try {
-    const response = await api.recognition.recognize(image.value, hint.value || undefined)
+    // Gedrehte Ansichten nutzt das Backend nur, wenn es im Original keinen brauchbaren Aufdruck findet.
+    const views = await Promise.all([rotateImage(image.value, true), rotateImage(image.value, false)]).catch(() => [])
+    const response = await api.recognition.recognize(image.value, hint.value || undefined, views)
     result.value = response
     const r = response.recognized
     fields.value = {
@@ -193,6 +195,18 @@ onMounted(async () => {
           <p v-if="result.recognized.alternatives.length" class="text-sm text-surface-500">
             Alternativen: {{ result.recognized.alternatives.join(', ') }}
           </p>
+          <div v-if="result.recognized.sources.length" class="flex flex-col gap-1 rounded-lg bg-surface-100 p-3 text-sm dark:bg-surface-800">
+            <span class="font-medium"><i class="pi pi-globe mr-1" />Per Websuche bestimmt</span>
+            <span v-if="result.recognized.webFinding" class="text-surface-600 dark:text-surface-300">{{ result.recognized.webFinding }}</span>
+            <a
+              v-for="source in result.recognized.sources"
+              :key="source.url"
+              :href="source.url"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="truncate text-primary hover:underline"
+            >{{ source.title }}</a>
+          </div>
           <Message v-if="result.recognized.confidence < 0.6" severity="secondary" size="small">
             Unsicher. Hilfreich sind ein Foto der Seite mit der Beschriftung oder ein Hinweis wie „Display“, dann noch einmal erkennen.
           </Message>
