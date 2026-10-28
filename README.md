@@ -12,22 +12,22 @@ Lagerverwaltung für Elektronikbauteile mit Fotoerkennung und Projektvorschläge
 | --- | --- |
 | `backend/` | ASP.NET Core (.NET 10), Minimal APIs, EF Core + PostgreSQL, Microsoft.Extensions.AI |
 | `frontend/` | Vue 3, TypeScript, Vite, Tailwind CSS 4, Pinia, PrimeVue 4 |
-| LLM | LM Studio auf oi-o-mat (oder jeder andere OpenAI-kompatible Server), Standardmodell `gemma-4-e4b-it-mlx` |
+| LLM | LM Studio auf oi-o-mat hinter der LLM-Schranke (Port 1235), Standardmodell `gemma-4-e4b-it-mlx` |
 | Websuche | SearXNG im Container |
 
-Das LLM wird über die OpenAI-kompatible API angesprochen; Endpoint und Modell stehen in der Konfiguration (`Llm:*`). Ob ein Bauteil vorhanden ist, entscheidet nicht das Modell, sondern ein deterministischer Abgleich im Backend (`InventoryMatcher`).
+Das LLM wird über die OpenAI-kompatible API der LLM-Schranke angesprochen; Adresse, App-Name und Modelle stehen in der Konfiguration (`LlmGate:*`, `Llm:*`). Ob ein Bauteil vorhanden ist, entscheidet nicht das Modell, sondern ein deterministischer Abgleich im Backend (`InventoryMatcher`).
 
-## Zusammenspiel mit Tonwerk und yue-guard
+## LLM-Schranke auf oi-o-mat
 
-LM Studio auf oi-o-mat teilt sich den Speicher mit Tonwerk-AI. Damit Ohmventory nicht stört:
+LM Studio auf oi-o-mat teilt sich den Speicher mit Tonwerk-AI, das immer Vorrang hat. Ohmventory spricht LM Studio deshalb nie direkt an (Port 1234), sondern nur die **LLM-Schranke** davor (`http://192.168.2.122:1235/v1`, Beschreibung in `docs/llm-gate.md` im Repository `Marcel-B/scripts`). Die Schranke reiht die Anfragen ein, hält sie zurück, solange Tonwerk arbeitet, und lädt und entlädt die Modelle selbst.
 
-- **Kleines, festes Modell:** `gemma-4-e4b-it-mlx` (≈ 7 GB, kann Bilder und Tool-Calls). Für die Fotoerkennung lässt sich mit `LLM_VISION_MODEL` ein größeres Modell setzen (z. B. `gemma-4-26b-a4b-it-qat-mlx`, ≈ 16 GB). Das passt nicht neben die großen Tonwerk-Modelle: dann in der yue-guard-Konfiguration beide Modelle unter `MODELS` eintragen und `PAUSE_FOR` leer lassen.
-- **Feste Kontextlänge:** Vor jeder Anfrage prüft das Backend über `GET /api/v1/models`, ob das Modell geladen ist, und lädt es sonst mit `POST /api/v1/models/load` und `context_length` 8192. Andere Modelle werden nie angefasst, entladen wird nichts.
-- **Eingaben gekürzt:** Anfragen werden vorab auf das Kontextbudget geschätzt; lange Werkzeugergebnisse und Recherchetexte werden gekürzt, statt an LM Studio zu scheitern.
-- **Entladenes Modell:** Verbindungs- und Serverfehler werden bis zu 5 Minuten mit Backoff wiederholt. Gespeichert wird erst, wenn die Antwort vollständig ist.
-- **Anhaltbar:** `POST /api/llm/pause` und `POST /api/llm/resume` (idempotent, Zustand übersteht Neustarts). Während der Pause antworten Erkennung und Assistent sofort mit 503, die App zeigt einen Hinweis; Lager, Container und Einkaufsliste laufen weiter. `GET /api/llm/status` zeigt den Zustand.
-
-Die Vorlage für den Wächter liegt in [`docker/yue-guard/ohmventory.conf`](docker/yue-guard/ohmventory.conf). Danach mit `yue-guard status` prüfen und z. B. in Tonwerk „Cover malen“ starten: nach höchstens 30 s steht `ohmventory: angehalten`.
+- **Anmeldung beim Start:** `PUT /gate/apps/ohmventory` mit Modell, Priorität (20), `holdFor` und Notiz aus `LlmGate:*` in `appsettings.json`. Ist die Schranke nicht erreichbar, versucht es das Backend weiter (10 s, verdoppelt bis 10 min); die App startet trotzdem. Was in der Oberfläche `/gate` festgelegt ist, gewinnt immer.
+- **Freigabe:** Bis Marcel das Modell unter <http://192.168.2.122:1235/gate> für `ohmventory` freigibt oder installiert, antwortet die Schranke mit 403. Erkennung und Assistent zeigen dann „noch nicht freigegeben“.
+- **Fehler der Schranke:** 503 wird nach `Retry-After` wiederholt, insgesamt bis `Llm:Timeout` (70 min). 403, 424 und 507 sind Konfigurationsfehler: Sie stehen im Log, und für `Llm:ConfigErrorCooldown` (2 min) wird nicht erneut gefragt. Abgebrochene Antworten (Modell mitten in der Antwort entladen) und 502 werden bis zu 5 Minuten mit Backoff wiederholt. Gespeichert wird erst, wenn die Antwort vollständig ist.
+- **Kleines, festes Modell:** `gemma-4-e4b-it-mlx` (≈ 7 GB, kann Bilder und Tool-Calls), passt neben YuE2, daher `holdFor` ohne `songs`. Mit `LLM_VISION_MODEL` lässt sich für die Fotoerkennung ein größeres Modell setzen (z. B. `gemma-4-26b-a4b-it-qat-mlx`, ≈ 16 GB); Ohmventory meldet es dann mit an. Das passt nicht neben die großen Tonwerk-Modelle: in `/gate` `holdFor` leeren.
+- **Feste Kontextlänge:** Die Schranke lädt das Modell mit `Llm:ContextLength` (8192). Anfragen werden vorab auf dieses Budget geschätzt; lange Werkzeugergebnisse und Recherchetexte werden gekürzt, statt abgelehnt zu werden.
+- **Lange Wartezeiten:** nginx wartet bis zu 75 Minuten auf `/api/`, damit eine zurückgehaltene Anfrage nicht vorher abbricht.
+- **Pausenwächter (optional):** Anhalten muss yue-guard Ohmventory nicht, denn außer dem Modell belegt es nichts auf oi-o-mat. Ein Eintrag nach [`docker/yue-guard/ohmventory.conf`](docker/yue-guard/ohmventory.conf) sorgt aber dafür, dass der Wächter das Modell entlädt, sobald Tonwerk anfängt (`MODELS`); `POST /api/llm/pause` und `/resume` bleiben dafür erhalten (idempotent, Zustand übersteht Neustarts).
 
 ## Installation auf Proxmox (empfohlen)
 
@@ -39,7 +39,7 @@ bash install-lxc.sh                                        # DHCP, nächste frei
 CTID=120 IP=192.168.2.130/24 GATEWAY=192.168.2.1 bash install-lxc.sh   # statische IP
 ```
 
-Das Skript legt einen unprivilegierten Debian-12-Container mit Docker an (`nesting`, `keyctl`, Autostart), klont das Repository nach `/opt/ohmventory`, erzeugt eine `.env` mit zufälligen Passwörtern, startet den Stack, prüft, ob LM Studio erreichbar ist, und gibt am Ende die fertige yue-guard-Konfiguration mit der richtigen CT-ID aus. Alle Optionen stehen im Kopf des Skripts.
+Das Skript legt einen unprivilegierten Debian-12-Container mit Docker an (`nesting`, `keyctl`, Autostart), klont das Repository nach `/opt/ohmventory`, erzeugt eine `.env` mit zufälligen Passwörtern, startet den Stack und prüft, ob die LLM-Schranke erreichbar ist. Alle Optionen stehen im Kopf des Skripts.
 
 Update von Hand: dasselbe Skript mit der CT-ID des bestehenden Containers aufrufen (`CTID=120 bash install-lxc.sh`). `.env` und Daten bleiben erhalten.
 
@@ -57,12 +57,11 @@ Hinweis: Datenbank-Migrationen laufen beim Start der API. Ein Zurückrollen setz
 
 ## Starten mit Docker
 
-1. In LM Studio muss der Server laufen und „Serve on Local Network“ an sein; das Modell lädt Ohmventory selbst.
+1. Auf oi-o-mat muss die LLM-Schranke laufen (`bin/llm-gate status` im scripts-Repo); das Modell lädt sie selbst.
 2. `cp .env.example .env`, ein `POSTGRES_PASSWORD` eintragen und `PUBLIC_BASE_URL` auf die LAN-Adresse des Rechners setzen, damit QR-Codes vom Handy aus funktionieren.
 3. `docker compose up -d --build`
 4. App unter <http://localhost:8080> öffnen.
-
-5. yue-guard-Eintrag anlegen (siehe oben).
+5. Das Modell unter <http://192.168.2.122:1235/gate> für `ohmventory` freigeben (siehe oben).
 
 ## Entwicklung
 

@@ -39,6 +39,7 @@ public static class LlmEndpoints
     public static ProblemHttpResult Problem(string title, Exception ex) => ex switch
     {
         LlmPausedException => TypedResults.Problem(title: "LLM pausiert", detail: ex.Message, statusCode: StatusCodes.Status503ServiceUnavailable),
+        LlmGateRejectedException => TypedResults.Problem(title: "LLM nicht verfügbar", detail: ex.Message, statusCode: StatusCodes.Status503ServiceUnavailable),
         LlmInputTooLargeException => TypedResults.Problem(title: title, detail: ex.Message, statusCode: StatusCodes.Status422UnprocessableEntity),
         _ => TypedResults.Problem(
             title: title,

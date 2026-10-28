@@ -30,8 +30,9 @@ services:
         condition: service_healthy
     environment:
       ConnectionStrings__Ohmventory: Host=db;Database=ohmventory;Username=ohmventory;Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env setzen}
-      # LM Studio läuft auf oi-o-mat („Serve on Local Network“), nicht im Container.
-      Llm__Endpoint: ${LLM_ENDPOINT:-http://192.168.2.122:1234/v1}
+      # Modelle laufen in LM Studio auf oi-o-mat; Ohmventory spricht nur mit der LLM-Schranke davor
+      # (Port 1235, nie LM Studio direkt auf 1234). LLM_ENDPOINT aus älteren .env-Dateien wird nicht mehr gelesen.
+      LlmGate__Url: ${LLM_GATE_URL:-http://192.168.2.122:1235}
       Llm__VisionModel: ${LLM_VISION_MODEL:-${LLM_MODEL:-gemma-4-e4b-it-mlx}}
       Llm__ChatModel: ${LLM_MODEL:-gemma-4-e4b-it-mlx}
       Llm__ContextLength: ${LLM_CONTEXT_LENGTH:-8192}

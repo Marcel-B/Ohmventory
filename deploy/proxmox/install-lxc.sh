@@ -18,7 +18,7 @@
 #   GATEWAY         Gateway bei statischer IP
 #   CORES / MEMORY / SWAP / DISK   (2 / 2048 MB / 512 MB / 16 GB)
 #   REPO_URL / BRANCH              (https://github.com/Marcel-B/Ohmventory.git / main)
-#   LLM_ENDPOINT    LM Studio auf oi-o-mat (http://192.168.2.122:1234/v1)
+#   LLM_GATE_URL    LLM-Schranke auf oi-o-mat, nie LM Studio direkt (http://192.168.2.122:1235)
 #   LLM_MODEL       (gemma-4-e4b-it-mlx)
 #   WEB_PORT        Port der App im Container (8080)
 #   AUTO_UPDATE     1: neue Stände von BRANCH automatisch installieren (siehe deploy/auto-update.sh), 0: aus (1)
@@ -37,7 +37,7 @@ SWAP="${SWAP:-512}"
 DISK="${DISK:-16}"
 REPO_URL="${REPO_URL:-https://github.com/Marcel-B/Ohmventory.git}"
 BRANCH="${BRANCH:-main}"
-LLM_ENDPOINT="${LLM_ENDPOINT:-http://192.168.2.122:1234/v1}"
+LLM_GATE_URL="${LLM_GATE_URL:-http://192.168.2.122:1235}"
 LLM_MODEL="${LLM_MODEL:-gemma-4-e4b-it-mlx}"
 WEB_PORT="${WEB_PORT:-8080}"
 AUTO_UPDATE="${AUTO_UPDATE:-1}"
@@ -160,7 +160,7 @@ install_app() {
     in_ct "cat > $APP_DIR/.env <<ENV
 POSTGRES_PASSWORD=\$(openssl rand -hex 16)
 SEARXNG_SECRET=\$(openssl rand -hex 32)
-LLM_ENDPOINT=$LLM_ENDPOINT
+LLM_GATE_URL=$LLM_GATE_URL
 LLM_MODEL=$LLM_MODEL
 LLM_CONTEXT_LENGTH=8192
 LLM_CONTROL_TOKEN=
@@ -182,10 +182,14 @@ chmod 600 $APP_DIR/.env"
   done
   in_ct "curl -fsS http://127.0.0.1:$WEB_PORT/api/health >/dev/null" || warn "App antwortet noch nicht – Logs: pct exec $CTID -- docker compose -f $APP_DIR/docker-compose.yml logs api"
 
-  if in_ct "curl -fsS -m 5 ${LLM_ENDPOINT%/}/models >/dev/null 2>&1"; then
-    log "LM Studio unter $LLM_ENDPOINT erreichbar"
+  # Bestehende .env-Dateien behalten ihre Adresse; die gilt dann auch hier.
+  local gate_url
+  gate_url=$(in_ct "sed -n 's/^LLM_GATE_URL=//p' $APP_DIR/.env | tail -n 1")
+  gate_url="${gate_url:-$LLM_GATE_URL}"
+  if in_ct "curl -fsS -m 5 ${gate_url%/}/gate/status >/dev/null 2>&1"; then
+    log "LLM-Schranke unter $gate_url erreichbar"
   else
-    warn "LM Studio unter $LLM_ENDPOINT nicht erreichbar. Läuft der Server mit "Serve on Local Network"?"
+    warn "LLM-Schranke unter $gate_url nicht erreichbar. Läuft sie auf oi-o-mat (bin/llm-gate status im scripts-Repo)?"
   fi
 
   setup_auto_update
@@ -194,12 +198,9 @@ chmod 600 $APP_DIR/.env"
 
 Ohmventory läuft: http://$ct_ip:$WEB_PORT  (Container $CTID)
 
-Für yue-guard auf oi-o-mat (~/.config/yue-tools/guard.d/ohmventory.conf):
-
-PAUSE='ssh proxmox "pct exec $CTID -- curl -fsS -X POST http://127.0.0.1:$WEB_PORT/api/llm/pause"'
-RESUME='ssh proxmox "pct exec $CTID -- curl -fsS -X POST http://127.0.0.1:$WEB_PORT/api/llm/resume"'
-MODELS='$LLM_MODEL'
-PAUSE_FOR='lyrics images ace singing speech voices'
+Ohmventory meldet sich beim Start als "ohmventory" bei der LLM-Schranke an.
+Bis das Modell dort freigegeben ist, scheitern Erkennung und Assistent mit "nicht freigegeben":
+Freigeben oder installieren unter ${gate_url%/}/gate
 
 Auto-Update: Neue Stände von $BRANCH werden alle 5 Minuten installiert, sobald die CI grün ist
 (abschalten mit AUTO_UPDATE=0; Logs: pct exec $CTID -- journalctl -u ohmventory-update).

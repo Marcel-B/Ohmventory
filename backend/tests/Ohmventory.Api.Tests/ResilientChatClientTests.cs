@@ -14,7 +14,7 @@ public class ResilientChatClientTests : IDisposable
 
     public ResilientChatClientTests()
     {
-        _options = new LlmOptions { ManagementEndpoint = "off", StateFile = _stateFile, RetryWindow = TimeSpan.FromMinutes(5) };
+        _options = new LlmOptions { StateFile = _stateFile, RetryWindow = TimeSpan.FromMinutes(5) };
         _pause = new LlmPauseState(Options.Create(_options));
     }
 
@@ -26,9 +26,8 @@ public class ResilientChatClientTests : IDisposable
     }
 
     private ResilientChatClient Create(FakeChatClient inner, List<TimeSpan>? delays = null) =>
-        new(inner, "gemma-4-e4b-it-mlx", _pause,
-            new LmStudioModelLoader(new HttpClient(), Options.Create(_options), NullLogger<LmStudioModelLoader>.Instance),
-            Options.Create(_options), NullLogger<ResilientChatClient>.Instance)
+        new(inner, "gemma-4-e4b-it-mlx", _pause, Options.Create(_options),
+            Options.Create(new LlmGateOptions { App = "ohmventory" }), NullLogger<ResilientChatClient>.Instance)
         {
             Delay = (d, _) => { delays?.Add(d); return Task.CompletedTask; },
         };
