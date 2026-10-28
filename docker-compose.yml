@@ -33,7 +33,7 @@ services:
       # Modelle laufen in LM Studio auf oi-o-mat; Ohmventory spricht nur mit der LLM-Schranke davor
       # (Port 1235, nie LM Studio direkt auf 1234). LLM_ENDPOINT aus älteren .env-Dateien wird nicht mehr gelesen.
       LlmGate__Url: ${LLM_GATE_URL:-http://192.168.2.122:1235}
-      Llm__VisionModel: ${LLM_VISION_MODEL:-${LLM_MODEL:-gemma-4-e4b-it-mlx}}
+      Llm__VisionModel: ${LLM_VISION_MODEL:-gemma-4-26b-a4b-it-qat-mlx}
       Llm__ChatModel: ${LLM_MODEL:-gemma-4-e4b-it-mlx}
       Llm__ContextLength: ${LLM_CONTEXT_LENGTH:-8192}
       Llm__ControlToken: ${LLM_CONTROL_TOKEN:-}
