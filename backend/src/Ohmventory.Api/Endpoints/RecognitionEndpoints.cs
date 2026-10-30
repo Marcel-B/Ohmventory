@@ -22,6 +22,31 @@ public static class RecognitionEndpoints
         ["image/webp"] = ".webp",
     };
 
+    private const string AllowedText = "Erlaubt sind JPEG, PNG, WebP und HEIC.";
+
+    /// <summary>
+    /// Liest ein hochgeladenes Bild. HEIC/HEIF (erkannt am Inhalt, nicht am oft fehlenden Content-Type) wird in JPEG umgewandelt,
+    /// JPEG, PNG und WebP bleiben, wie sie sind. Null bei allem anderen und bei kaputten HEIC-Dateien.
+    /// </summary>
+    private static async Task<(byte[] Data, string ContentType)?> ReadImageAsync(IFormFile file, CancellationToken ct)
+    {
+        using var buffer = new MemoryStream();
+        await file.CopyToAsync(buffer, ct);
+        var data = buffer.ToArray();
+        if (HeifConverter.IsHeif(data))
+        {
+            try
+            {
+                return (await Task.Run(() => HeifConverter.ToJpeg(data), ct), "image/jpeg");
+            }
+            catch (ImageMagick.MagickException)
+            {
+                return null;
+            }
+        }
+        return AllowedTypes.ContainsKey(file.ContentType) ? (data, file.ContentType) : null;
+    }
+
     public static void MapRecognitionEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/api/recognition", async Task<Results<Ok<RecognitionResponse>, ValidationProblem, ProblemHttpResult>> (
@@ -34,30 +59,25 @@ public static class RecognitionEndpoints
             OhmventoryDbContext db,
             CancellationToken ct) =>
         {
-            if (!AllowedTypes.TryGetValue(file.ContentType, out var extension))
-                return PartEndpoints.Validation("file", "Erlaubt sind JPEG, PNG und WebP.");
             if (file.Length is 0 or > MaxImageBytes)
                 return PartEndpoints.Validation("file", "Das Bild muss zwischen 1 Byte und 15 MB groß sein.");
-
-            using var buffer = new MemoryStream();
-            await file.CopyToAsync(buffer, ct);
-            var bytes = buffer.ToArray();
+            if (await ReadImageAsync(file, ct) is not (var bytes, var contentType))
+                return PartEndpoints.Validation("file", AllowedText);
+            var extension = AllowedTypes[contentType];
 
             // Gedrehte Ansichten desselben Fotos schickt die App mit, damit senkrechter Text lesbar wird. Sie werden nicht gespeichert.
             var views = new List<(byte[] Data, string MediaType)>();
             foreach (var view in request.Form.Files.GetFiles("views").Take(MaxViews))
             {
-                if (!AllowedTypes.ContainsKey(view.ContentType) || view.Length is 0 or > MaxImageBytes)
-                    return PartEndpoints.Validation("views", "Zusätzliche Ansichten müssen JPEG, PNG oder WebP bis 15 MB sein.");
-                using var viewBuffer = new MemoryStream();
-                await view.CopyToAsync(viewBuffer, ct);
-                views.Add((viewBuffer.ToArray(), view.ContentType));
+                if (view.Length is 0 or > MaxImageBytes || await ReadImageAsync(view, ct) is not { } viewImage)
+                    return PartEndpoints.Validation("views", "Zusätzliche Ansichten müssen JPEG, PNG, WebP oder HEIC bis 15 MB sein.");
+                views.Add(viewImage);
             }
 
             RecognizedPart recognized;
             try
             {
-                recognized = await recognition.RecognizeAsync(bytes, file.ContentType, views, hint, ct);
+                recognized = await recognition.RecognizeAsync(bytes, contentType, views, hint, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
@@ -68,11 +88,11 @@ public static class RecognitionEndpoints
             {
                 Id = Guid.NewGuid(),
                 FileName = "",
-                ContentType = file.ContentType,
+                ContentType = contentType,
                 RecognitionJson = PartRecognitionService.Serialize(recognized),
             };
-            buffer.Position = 0;
-            image.FileName = await storage.SaveAsync(image.Id, extension, buffer, ct);
+            using var stored = new MemoryStream(bytes, writable: false);
+            image.FileName = await storage.SaveAsync(image.Id, extension, stored, ct);
             db.PartImages.Add(image);
             await db.SaveChangesAsync(ct);
 
@@ -83,6 +103,18 @@ public static class RecognitionEndpoints
                 .ToList();
 
             return TypedResults.Ok(new RecognitionResponse(image.Id, recognized, matches));
+        })
+        .DisableAntiforgery()
+        .WithTags("Erkennung");
+
+        // Wandelt ein HEIC-Foto in JPEG um. Die App braucht das in Browsern, die HEIC nicht selbst anzeigen können (alle außer Safari).
+        app.MapPost("/api/images/convert", async Task<Results<FileContentHttpResult, ValidationProblem>> (IFormFile file, CancellationToken ct) =>
+        {
+            if (file.Length is 0 or > MaxImageBytes)
+                return PartEndpoints.Validation("file", "Das Bild muss zwischen 1 Byte und 15 MB groß sein.");
+            if (await ReadImageAsync(file, ct) is not (var bytes, var contentType))
+                return PartEndpoints.Validation("file", AllowedText);
+            return TypedResults.File(bytes, contentType);
         })
         .DisableAntiforgery()
         .WithTags("Erkennung");

@@ -1,4 +1,12 @@
 /**
+ * HEIC/HEIF ist das Standardformat der iPhone-Kamera. Safari kann es selbst lesen, Chrome und Firefox nicht;
+ * dort wandelt das Backend es vorher in JPEG um. Manche Systeme liefern für .heic keinen MIME-Typ, deshalb zählt auch die Endung.
+ */
+export function isHeic(file: File): boolean {
+  return /^image\/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name)
+}
+
+/**
  * Verkleinert Handyfotos vor dem Upload. Für die Erkennung reichen ~1600 px Kantenlänge,
  * und das lokale Vision-Modell antwortet bei kleineren Bildern deutlich schneller.
  */
