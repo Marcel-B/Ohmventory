@@ -28,7 +28,7 @@ interface ProblemDetails {
   errors?: Record<string, string[]>
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function send(path: string, init: RequestInit = {}): Promise<Response> {
   const isForm = init.body instanceof FormData
   const response = await fetch(`/api${path}`, {
     ...init,
@@ -38,6 +38,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!response.ok) {
     throw new ApiError(await errorMessage(response), response.status)
   }
+  return response
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await send(path, init)
   if (response.status === 204) {
     return undefined as T
   }
@@ -72,6 +77,12 @@ export const api = {
   images: {
     url: (id: string) => `/api/images/${id}`,
     assign: (id: string, partId: string) => request<void>(`/images/${id}/assign/${partId}`, { method: 'POST' }),
+    /** Wandelt ein HEIC-Foto im Backend in JPEG um, für Browser, die HEIC nicht selbst lesen können. */
+    convert: async (file: Blob) => {
+      const form = new FormData()
+      form.append('file', file)
+      return (await send('/images/convert', { method: 'POST', body: form })).blob()
+    },
   },
   recognition: {
     recognize: (file: Blob, hint?: string, views: Blob[] = []) => {

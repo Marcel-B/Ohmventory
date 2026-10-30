@@ -13,7 +13,7 @@ import { api } from '../api/client'
 import type { PartFields, RecognitionResponse } from '../api/types'
 import LlmPausedNotice from '../components/LlmPausedNotice.vue'
 import PartForm from '../components/PartForm.vue'
-import { resizeImage, rotateImage } from '../composables/resizeImage'
+import { isHeic, resizeImage, rotateImage } from '../composables/resizeImage'
 import { useLlmStatus } from '../composables/useLlmStatus'
 import { useNotify } from '../composables/useNotify'
 import { useContainersStore } from '../stores/containers'
@@ -58,7 +58,10 @@ async function onFile(event: Event) {
   if (!file) return
   reset()
   try {
-    image.value = await resizeImage(file)
+    image.value = await resizeImage(file).catch(async (e) => {
+      if (!isHeic(file)) throw e
+      return resizeImage(new File([await api.images.convert(file)], 'foto.jpg', { type: 'image/jpeg' }))
+    })
     preview.value = URL.createObjectURL(image.value)
   } catch (e) {
     notify.error(e)
@@ -152,7 +155,7 @@ onMounted(async () => {
     <Card>
       <template #content>
         <div class="flex flex-col gap-4">
-          <input ref="fileInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onFile" />
+          <input ref="fileInput" type="file" accept="image/*,.heic,.heif" capture="environment" class="hidden" @change="onFile" />
           <div
             class="flex min-h-56 cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-surface-300 dark:border-surface-700"
             @click="fileInput?.click()"
