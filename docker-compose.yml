@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:17-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ohmventory
       POSTGRES_USER: ohmventory
@@ -16,6 +17,7 @@ services:
 
   searxng:
     image: searxng/searxng:latest
+    restart: unless-stopped
     environment:
       SEARXNG_SECRET: ${SEARXNG_SECRET:-}
     volumes:
@@ -25,6 +27,7 @@ services:
 
   api:
     build: ./backend
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
@@ -47,6 +50,7 @@ services:
 
   web:
     build: ./frontend
+    restart: unless-stopped
     depends_on:
       - api
     ports:
